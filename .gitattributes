@@ -1,0 +1,2 @@
+# 统一 LF：Dockerfile 的续行符、shell 片段在 CRLF 下会出错
+* text=auto eol=lf

@@ -1,0 +1,71 @@
+// 航标（hangbiao）：把「有序策略组」模型搬到 Web 与 Docker 里。
+// 模型参考 pengchujin/tower（MIT），本项目为独立实现，界面与服务端均为重写。
+package main
+
+import (
+	"embed"
+	"flag"
+	"io/fs"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"towerdocker/internal/api"
+	"towerdocker/internal/model"
+	"towerdocker/internal/scheme"
+	"towerdocker/internal/store"
+)
+
+//go:embed all:web/dist
+var distFS embed.FS
+
+func main() {
+	addr := flag.String("addr", ":8630", "监听地址")
+	dataDir := flag.String("data", "./data", "数据目录")
+	flag.Parse()
+
+	if err := os.MkdirAll(*dataDir, 0o755); err != nil {
+		log.Fatalf("数据目录不可用：%v", err)
+	}
+	st, err := store.Open(filepath.Join(*dataDir, "state.json"))
+	if err != nil {
+		log.Fatalf("读取数据失败：%v", err)
+	}
+	// 运行时可从 ACL4SSR 上游同步最新的 ini；同步结果缓存在数据目录里
+	scheme.SetCachePath(filepath.Join(*dataDir, "acl4ssr-sync.json"))
+	if err := scheme.LoadCache(); err != nil {
+		log.Printf("读取 ACL4SSR 同步缓存失败（将使用内置方案）：%v", err)
+	}
+	if len(st.Get().Groups) == 0 {
+		if err := st.Update(func(s *model.State) error { return scheme.Apply(s, scheme.PresetFull) }); err != nil {
+			log.Fatalf("初始化方案失败：%v", err)
+		}
+		log.Printf("首次启动，已载入「ACL4SSR 全分组」方案（revision %s）", scheme.Revision())
+	}
+	// 旧版本创建的状态可能还没有 antiad，启动时补齐（只补规则集，不加引用）。
+	if err := st.Update(func(s *model.State) error {
+		scheme.EnsureAntiAd(s)
+		return nil
+	}); err != nil {
+		log.Printf("补全默认规则集失败：%v", err)
+	}
+
+	static, err := fs.Sub(distFS, "web/dist")
+	if err != nil {
+		log.Fatalf("前端资源缺失：%v", err)
+	}
+
+	engine := api.New(st, static)
+	go engine.AutoRefresh()
+	srv := &http.Server{
+		Addr:              *addr,
+		Handler:           engine,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	log.Printf("航标已启动 %s，数据目录 %s，订阅地址 /sub?target=auto", *addr, *dataDir)
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
+}

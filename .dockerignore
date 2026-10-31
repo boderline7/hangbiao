@@ -1,0 +1,11 @@
+node_modules
+web/node_modules
+web/dist
+data
+*.log
+.git
+.github
+docs
+tools
+data-snapshot-state.json
+交接说明.md
