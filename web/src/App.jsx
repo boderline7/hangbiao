@@ -19,6 +19,8 @@ export default function App() {
   const [tab, setTab] = useState('groups')
   const [toast, setToast] = useState(null)
   const [theme, setTheme] = useState(() => localStorage.getItem('td-theme') || 'dark')
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
   const timer = useRef(null)
 
   useEffect(() => {
@@ -50,9 +52,15 @@ export default function App() {
         if (!prev) return prev
         const next = JSON.parse(JSON.stringify(prev))
         recipe(next)
+        setDirty(true)
         window.clearTimeout(timer.current)
-        timer.current = window.setTimeout(() => {
-          api.save(next).catch((e) => showToast('保存失败：' + e.message, 'error'))
+        timer.current = window.setTimeout(async () => {
+          try {
+            await api.save(next)
+            setDirty(false)
+          } catch (e) {
+            showToast('自动保存失败：' + e.message, 'error')
+          }
         }, 450)
         return next
       })
@@ -60,7 +68,36 @@ export default function App() {
     [showToast],
   )
 
-  const replace = useCallback((next) => setState(next), [])
+  // 手动保存：清掉防抖，立刻写盘，并用服务端回执作为反馈。
+  const saveNow = useCallback(async () => {
+    if (!state) return
+    setSaving(true)
+    window.clearTimeout(timer.current)
+    try {
+      const saved = await api.save(state)
+      setState(saved)
+      setDirty(false)
+      showToast(
+        `已保存到服务器：${saved.groups.length} 组 / ${saved.rules.length} 条规则 · ${new Date().toLocaleTimeString()}`
+      )
+    } catch (e) {
+      showToast('保存失败：' + e.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }, [state, showToast])
+
+  // 刷新：丢弃本地未保存的改动，重新读取服务器状态。
+  const reload = useCallback(async () => {
+    await load()
+    setDirty(false)
+    showToast('已从服务器重新加载')
+  }, [load, showToast])
+
+  const replace = useCallback((next) => {
+    setState(next)
+    setDirty(false)
+  }, [])
 
   if (!state) {
     return (
@@ -104,6 +141,17 @@ export default function App() {
                 title="切换主题"
               >
                 {theme === 'dark' ? '浅色' : '深色'}
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={saveNow}
+                disabled={saving}
+                title="立即写入服务器 data/state.json"
+              >
+                {saving ? '保存中…' : dirty ? '保存更改' : '保存'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={reload} title="丢弃未保存改动，重新读取服务器状态">
+                刷新
               </button>
             </div>
           </div>

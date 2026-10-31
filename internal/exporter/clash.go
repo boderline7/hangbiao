@@ -291,7 +291,10 @@ func Clash(st *model.State) (Result, error) {
 	appendKV(dns, "ipv6", !st.Settings.IPv6Disabled)
 	appendKV(dns, "enhanced-mode", "fake-ip")
 	appendKV(dns, "fake-ip-range", "198.18.0.1/16")
+	// 这些域名不分配伪 IP，避免系统探测、局域网访问出问题。
+	appendKV(dns, "fake-ip-filter", []string{"*.lan", "+.local", "+.msftconnecttest.com", "+.msftncsi.com"})
 	appendKV(dns, "default-nameserver", []string{"223.5.5.5", "119.29.29.29"})
+	appendKV(dns, "proxy-server-nameserver", []string{"https://223.5.5.5/dns-query", "https://doh.pub/dns-query"})
 	if st.Settings.DisableDNS {
 		// 关掉加密 DNS 时退回明文：国内 223.5.5.5、国外 1.1.1.1。
 		appendKV(dns, "nameserver", []string{"223.5.5.5", "119.29.29.29"})
