@@ -3,7 +3,7 @@ package api
 import "testing"
 
 func TestLoadSubAcceptsPlainLinkInURLField(t *testing.T) {
-	link := "hysteria2://test-pw@hy2.example.com:8443/?sni=addons.mozilla.org&insecure=1#Hysteria2-8443"
+	link := "hysteria2://test-pw@hy2.example.com:8443/?sni=addons.mozilla.org&insecure=1#Hysteria2-测试"
 	nodes, format, _, _, err := loadSub(link, "")
 	if err != nil {
 		t.Fatalf("地址栏填明文链接应能解析，实际报错：%v", err)
