@@ -285,17 +285,21 @@ func Clash(st *model.State) (Result, error) {
 		appendNode(root, "tun", tun)
 	}
 
-	if !st.Settings.DisableDNS {
-		dns := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-		appendKV(dns, "enable", true)
-		appendKV(dns, "ipv6", !st.Settings.IPv6Disabled)
-		appendKV(dns, "enhanced-mode", "fake-ip")
-		appendKV(dns, "fake-ip-range", "198.18.0.1/16")
-		appendKV(dns, "default-nameserver", []string{"223.5.5.5", "119.29.29.29"})
+	dns := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	appendKV(dns, "enable", true)
+	appendKV(dns, "ipv6", !st.Settings.IPv6Disabled)
+	appendKV(dns, "enhanced-mode", "fake-ip")
+	appendKV(dns, "fake-ip-range", "198.18.0.1/16")
+	appendKV(dns, "default-nameserver", []string{"223.5.5.5", "119.29.29.29"})
+	if st.Settings.DisableDNS {
+		// 关掉加密 DNS 时退回明文：国内 223.5.5.5、国外 1.1.1.1。
+		appendKV(dns, "nameserver", []string{"223.5.5.5", "119.29.29.29"})
+		appendKV(dns, "fallback", []string{"1.1.1.1", "8.8.8.8"})
+	} else {
 		appendKV(dns, "nameserver", []string{"https://doh.pub/dns-query", "https://dns.alidns.com/dns-query"})
 		appendKV(dns, "fallback", []string{"https://1.1.1.1/dns-query", "https://dns.google/dns-query"})
-		appendNode(root, "dns", dns)
 	}
+	appendNode(root, "dns", dns)
 
 	pseq := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
 	for _, p := range st.Nodes() {

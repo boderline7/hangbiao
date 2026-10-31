@@ -159,8 +159,18 @@ func TestClashDisableSwitches(t *testing.T) {
 	if _, ok := doc["tun"]; ok {
 		t.Error("关闭 TUN 后不应该写 tun 段")
 	}
-	if _, ok := doc["dns"]; ok {
-		t.Error("关闭加密 DNS 后不应该写 dns 段")
+	// 关闭加密 DNS 只是换成明文解析，dns 段本身要保留。
+	dns, ok := doc["dns"].(map[string]any)
+	if !ok {
+		t.Fatal("关闭加密 DNS 后仍应写 dns 段")
+	}
+	ns, _ := dns["nameserver"].([]any)
+	if len(ns) == 0 || ns[0] != "223.5.5.5" {
+		t.Errorf("明文 nameserver=%v", dns["nameserver"])
+	}
+	fb, _ := dns["fallback"].([]any)
+	if len(fb) == 0 || fb[0] != "1.1.1.1" {
+		t.Errorf("明文 fallback=%v", dns["fallback"])
 	}
 	rules := rulesOf(t, doc)
 	if rules[0] != "DOMAIN-SUFFIX,example.com,节点选择" {

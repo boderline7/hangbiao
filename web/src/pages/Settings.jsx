@@ -132,7 +132,8 @@ export default function SettingsPage({ state, mutate }) {
         <div className="note" style={{ marginTop: 8 }}>
           TUN 使用 system 栈并接管 DNS（dns-hijack any:53），需要容器有 NET_ADMIN 权限或直接跑在宿主机。
           直连类开关（Tailscale / 本地 IP / 微力同步 / BT 下载）会写在规则最前面；「仅代理常见端口」只让
-          80 / 443 / 8080 / 8443 走分流，其余端口一律直连。
+          80 / 443 / 8080 / 8443 走分流，其余端口一律直连。关闭加密 DNS 后改用明文解析：国内
+          223.5.5.5 / 119.29.29.29，国外 fallback 1.1.1.1 / 8.8.8.8。
         </div>
       </div>
 
