@@ -296,6 +296,14 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast }) {
   if (!memberSet.has('$nodes')) memberOptions.push(['$nodes', '全部节点（动态）'])
   if (!memberSet.has('$groups')) memberOptions.push(['$groups', '全部策略组（动态）'])
   if (!memberSet.has('$regions')) memberOptions.push(['$regions', '全部地区组（动态）'])
+  for (const [v, l] of [
+    ['DIRECT', '直连 · DIRECT'],
+    ['REJECT', '拒绝 · REJECT'],
+    ['REJECT-DROP', '拒绝并断开 · REJECT-DROP'],
+    ['PASS', '放行 · PASS'],
+  ]) {
+    if (!memberSet.has(v)) memberOptions.push([v, l])
+  }
   for (const n of nodeNames) if (!memberSet.has(n)) memberOptions.push([n, n])
   for (const g of groups) if (g.name !== group.name && !memberSet.has(g.name)) memberOptions.push([g.name, '组 · ' + g.name])
 
