@@ -455,18 +455,34 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast }) {
               </option>
             ))}
           </select>
-          <input
-            className="input"
-            style={{ flex: 1, minWidth: 140 }}
-            placeholder="值，例如 google.com"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter') return
-              addRule({ type, value: value.trim(), target })
-              setValue('')
-            }}
-          />
+          {type === 'RULE-SET' ? (
+            <select
+              className="select"
+              style={{ flex: 1, minWidth: 140 }}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            >
+              <option value="">选择规则集…</option>
+              {(state.ruleSets || []).map((rs) => (
+                <option key={rs.id} value={rs.name}>
+                  {rs.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="input"
+              style={{ flex: 1, minWidth: 140 }}
+              placeholder="值，例如 google.com"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return
+                addRule({ type, value: value.trim(), target })
+                setValue('')
+              }}
+            />
+          )}
           <select className="select" value={target} onChange={(e) => setTarget(e.target.value)}>
             <option value="">目标：本组（{group.name}）</option>
             <option value="REJECT">目标：REJECT</option>
