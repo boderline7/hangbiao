@@ -10,6 +10,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -410,7 +411,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Query().Get("download") == "1" {
 		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", res.Filename))
+		setAttachment(w, res.Filename)
 		w.Write(res.Body)
 		return
 	}
@@ -425,7 +426,9 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSub(w http.ResponseWriter, r *http.Request) {
 	st := s.st.Get()
-	format := strings.ToLower(r.URL.Query().Get("target"))
+	target := strings.ToLower(r.URL.Query().Get("target"))
+	log.Printf("订阅请求 target=%q ua=%q", target, r.UserAgent())
+	format := target
 	if format == "" || format == "auto" {
 		format = detectFormat(r.UserAgent())
 	}
@@ -435,7 +438,7 @@ func (s *Server) handleSub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", res.Filename))
+	setAttachment(w, res.Filename)
 	w.Header().Set("Profile-Update-Interval", strconv.Itoa(st.Settings.UpdateInterval))
 	w.Header().Set("Cache-Control", "no-store")
 	if info := trafficHeader(st); info != "" {
@@ -459,6 +462,18 @@ func trafficHeader(st *model.State) string {
 		}
 	}
 	return ""
+}
+
+// setAttachment 用 ASCII 兜底文件名 + RFC 5987 的 UTF-8 文件名，避免中文在 HTTP 头里乱码。
+func setAttachment(w http.ResponseWriter, filename string) {
+	ascii := "hangbiao"
+	for _, r := range filename {
+		if r < 128 {
+			ascii += string(r)
+		}
+	}
+	w.Header().Set("Content-Disposition",
+		fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s", ascii, url.PathEscape(filename)))
 }
 
 // ---------- 静态文件 ----------
