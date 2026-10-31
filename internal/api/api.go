@@ -466,11 +466,15 @@ func trafficHeader(st *model.State) string {
 
 // setAttachment 用 ASCII 兜底文件名 + RFC 5987 的 UTF-8 文件名，避免中文在 HTTP 头里乱码。
 func setAttachment(w http.ResponseWriter, filename string) {
-	ascii := "hangbiao"
+	var b strings.Builder
 	for _, r := range filename {
-		if r < 128 {
-			ascii += string(r)
+		if r >= 0x20 && r < 0x7f {
+			b.WriteRune(r)
 		}
+	}
+	ascii := strings.TrimSpace(b.String())
+	if ascii == "" {
+		ascii = "hangbiao.yaml"
 	}
 	w.Header().Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s", ascii, url.PathEscape(filename)))

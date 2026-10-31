@@ -22,6 +22,12 @@ export default function App() {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const timer = useRef(null)
+  const stateRef = useRef(null)
+
+  // 让 stateRef 始终指向最新的 state，供保存逻辑读取。
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -48,33 +54,34 @@ export default function App() {
 
   const mutate = useCallback(
     (recipe) => {
-      setState((prev) => {
-        if (!prev) return prev
-        const next = JSON.parse(JSON.stringify(prev))
-        recipe(next)
-        setDirty(true)
-        window.clearTimeout(timer.current)
-        timer.current = window.setTimeout(async () => {
-          try {
-            await api.save(next)
-            setDirty(false)
-          } catch (e) {
-            showToast('自动保存失败：' + e.message, 'error')
-          }
-        }, 450)
-        return next
-      })
+      const prev = stateRef.current
+      if (!prev) return
+      const next = JSON.parse(JSON.stringify(prev))
+      recipe(next)
+      stateRef.current = next
+      setState(next)
+      setDirty(true)
+      window.clearTimeout(timer.current)
+      timer.current = window.setTimeout(async () => {
+        try {
+          await api.save(next)
+          setDirty(false)
+        } catch (e) {
+          showToast('自动保存失败：' + e.message, 'error')
+        }
+      }, 450)
     },
     [showToast],
   )
 
   // 手动保存：清掉防抖，立刻写盘，并用服务端回执作为反馈。
   const saveNow = useCallback(async () => {
-    if (!state) return
+    const cur = stateRef.current
+    if (!cur) return
     setSaving(true)
     window.clearTimeout(timer.current)
     try {
-      const saved = await api.save(state)
+      const saved = await api.save(cur)
       setState(saved)
       setDirty(false)
       showToast(
@@ -85,7 +92,7 @@ export default function App() {
     } finally {
       setSaving(false)
     }
-  }, [state, showToast])
+  }, [showToast])
 
   // 刷新：丢弃本地未保存的改动，重新读取服务器状态。
   const reload = useCallback(async () => {
