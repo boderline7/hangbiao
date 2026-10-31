@@ -101,16 +101,6 @@ func Revision() string {
 	return ACL4SSRRevision
 }
 
-// SourceOf 返回方案当前的数据来源：upstream（运行时同步）或 builtin（内置表）。
-func SourceOf(id string) string {
-	regMu.RLock()
-	defer regMu.RUnlock()
-	if _, ok := syncedDefs[id]; ok {
-		return "upstream"
-	}
-	return "builtin"
-}
-
 // SetCachePath 设置同步结果的落盘位置（一般是数据目录下的 acl4ssr-sync.json）。
 func SetCachePath(p string) {
 	regMu.Lock()
@@ -228,31 +218,38 @@ func Sync(ctx context.Context) (SyncResult, error) {
 	return SyncResult{Revision: rev, Presets: ids, Warnings: warnings, FetchedAt: now}, nil
 }
 
-// Catalog 返回内置方案 + 同步得到的上游方案，供 /api/presets 使用。
+// Catalog 返回已同步到上游 ini 的方案；还没同步过时返回空列表（界面据此
+// 不展示任何分组，直到同步成功）。
 func Catalog() []Preset {
 	regMu.RLock()
 	defs := syncedDefs
+	revision := syncedRevision
+	fetchedAt := syncedFetchedAt
 	regMu.RUnlock()
 
-	out := make([]Preset, 0, len(Presets)+len(defs))
-	seen := make(map[string]bool, len(defs))
-	for _, p := range Presets {
-		seen[p.ID] = true
-		out = append(out, p)
+	core := map[string]bool{}
+	for _, id := range corePresetFiles {
+		core[id] = true
 	}
-	extras := make([]Preset, 0, len(defs))
+	out := make([]Preset, 0, len(defs))
 	for id, def := range defs {
-		if seen[id] {
-			continue
-		}
-		extras = append(extras, Preset{
-			ID:   id,
-			Name: orDefault(def.Name, id),
-			Desc: "同步自 ACL4SSR Clash/config",
+		out = append(out, Preset{
+			ID:        id,
+			Name:      orDefault(def.Name, id),
+			Desc:      "同步自 ACL4SSR Clash/config",
+			Source:    "upstream",
+			Revision:  revision,
+			FetchedAt: fetchedAt,
 		})
 	}
-	sort.Slice(extras, func(i, j int) bool { return extras[i].Name < extras[j].Name })
-	return append(out, extras...)
+	// 三份核心 ini 排前面，其余按名字排，保证下拉顺序稳定。
+	sort.Slice(out, func(i, j int) bool {
+		if core[out[i].ID] != core[out[j].ID] {
+			return core[out[i].ID]
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
 }
 
 func presetIDs(defs map[string]upstreamDef) []string {
@@ -794,17 +791,25 @@ func applyUpstream(st *model.State, def upstreamDef) []string {
 			Seq:      seq,
 		})
 	}
-	// 兜底：ini 的 FINAL 组 > 最后一个组
-	final := def.Final
-	if final == "" || ids[final] == "" {
-		if len(st.Groups) > 0 {
-			final = st.Groups[len(st.Groups)-1].Name
-		} else {
-			final = "DIRECT"
-		}
+	// MATCH 固定落在最后一个组：ini 的 FINAL 组如果不在末尾，就把它移到最后，
+	// 这样不需要额外的「最终策略」设置。
+	if def.Final != "" {
+		moveGroupToEnd(st, def.Final)
 	}
-	st.Settings.FinalTarget = final
 	return warnings
+}
+
+// moveGroupToEnd 把指定组挪到末尾（不动其它组的相对顺序）。
+func moveGroupToEnd(st *model.State, name string) {
+	for i := range st.Groups {
+		if st.Groups[i].Name != name {
+			continue
+		}
+		g := st.Groups[i]
+		copy(st.Groups[i:], st.Groups[i+1:])
+		st.Groups[len(st.Groups)-1] = g
+		return
+	}
 }
 
 func filterNodeNames(pattern string, nodes []model.Proxy) []string {
@@ -851,10 +856,4 @@ func orDefaultInt(v, def int) int {
 
 func decodeBase64(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(s)
-}
-
-// UsesBuiltinRegions 判断当前方案是否还需要按内置地区表重建地区组。
-// 同步来的 ini 自带地区组（🇭🇰 香港节点 之类），不再额外生成。
-func UsesBuiltinRegions(st *model.State) bool {
-	return !strings.Contains(st.Settings.PresetID, "@upstream")
 }

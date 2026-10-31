@@ -116,23 +116,6 @@ func flaggedCode(name string) string {
 	return ""
 }
 
-// nodesByRegion 把节点按地区分组，键是地区组名（含「其他地区」）。
-func nodesByRegion(nodes []model.Proxy) map[string][]string {
-	out := map[string][]string{}
-	for _, p := range nodes {
-		code := DetectRegion(p.Name())
-		if code == "" {
-			continue
-		}
-		name := OtherRegionsName
-		if r, ok := regionByCode(code); ok {
-			name = r.Name
-		}
-		out[name] = append(out[name], p.Name())
-	}
-	return out
-}
-
 // RegionGroupNames 返回当前地区组（不含「· 延迟优选」）的有序名称。
 func RegionGroupNames(st *model.State) []string {
 	known := map[string]bool{OtherRegionsName: true}
@@ -146,61 +129,4 @@ func RegionGroupNames(st *model.State) []string {
 		}
 	}
 	return out
-}
-
-// SyncRegions 按当前节点重建地区组：先删掉旧的地区组，再按上游顺序追加。
-// 每个地区同时生成「🇭🇰 香港」选择组和隐藏的「🇭🇰 香港 · 延迟优选」测速组。
-// 运行时同步来的 ini 方案自带地区组，这里直接跳过。
-func SyncRegions(st *model.State) {
-	if !UsesBuiltinRegions(st) {
-		return
-	}
-	// 「其他地区」也要连自动测速组一起清掉，否则每轮同步都会残留一份。
-	known := map[string]bool{
-		OtherRegionsName:                    true,
-		OtherRegionsName + RegionAutoSuffix: true,
-	}
-	for _, r := range Regions {
-		known[r.Name] = true
-		known[r.Name+RegionAutoSuffix] = true
-	}
-	kept := st.Groups[:0]
-	for _, g := range st.Groups {
-		if !known[g.Name] {
-			kept = append(kept, g)
-		}
-	}
-	st.Groups = kept
-
-	byRegion := nodesByRegion(st.Nodes())
-	order := make([]string, 0, len(Regions)+1)
-	for _, r := range Regions {
-		order = append(order, r.Name)
-	}
-	order = append(order, OtherRegionsName)
-	for _, name := range order {
-		names := byRegion[name]
-		if len(names) == 0 {
-			continue
-		}
-		autoName := name + RegionAutoSuffix
-		st.Groups = append(st.Groups,
-			model.Group{
-				ID:       model.NewID(),
-				Name:     name,
-				Type:     "select",
-				Members:  append([]string{autoName}, names...),
-				Interval: regionInterval,
-			},
-			model.Group{
-				ID:       model.NewID(),
-				Name:     autoName,
-				Type:     "url-test",
-				URL:      regionTestURL,
-				Interval: regionInterval,
-				Members:  names,
-				Hidden:   true,
-			},
-		)
-	}
 }

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"towerdocker/internal/api"
-	"towerdocker/internal/model"
 	"towerdocker/internal/scheme"
 	"towerdocker/internal/store"
 	"towerdocker/internal/sub"
@@ -35,23 +34,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("读取数据失败：%v", err)
 	}
-	// 运行时可从 ACL4SSR 上游同步最新的 ini；同步结果缓存在数据目录里
+	// 运行时可从 ACL4SSR 上游同步最新的 ini；同步结果缓存在数据目录里。
+	// 没同步过就没有任何方案与分组，避免把未经同步的分组导出给客户端。
 	scheme.SetCachePath(filepath.Join(*dataDir, "acl4ssr-sync.json"))
 	if err := scheme.LoadCache(); err != nil {
-		log.Printf("读取 ACL4SSR 同步缓存失败（将使用内置方案）：%v", err)
-	}
-	if len(st.Get().Groups) == 0 {
-		if err := st.Update(func(s *model.State) error { return scheme.Apply(s, scheme.PresetFull) }); err != nil {
-			log.Fatalf("初始化方案失败：%v", err)
-		}
-		log.Printf("首次启动，已载入「ACL4SSR 全分组」方案（revision %s）", scheme.Revision())
-	}
-	// 旧版本创建的状态可能还没有 antiad，启动时补齐（只补规则集，不加引用）。
-	if err := st.Update(func(s *model.State) error {
-		scheme.EnsureAntiAd(s)
-		return nil
-	}); err != nil {
-		log.Printf("补全默认规则集失败：%v", err)
+		log.Printf("读取 ACL4SSR 同步缓存失败（请先在界面同步 ACL4SSR）：%v", err)
 	}
 
 	static, err := fs.Sub(distFS, "web/dist")

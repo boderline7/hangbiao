@@ -27,31 +27,6 @@ export default function SettingsPage({ state, mutate }) {
             />
           </div>
           <div className="field">
-            <label>控制端口（external-controller）</label>
-            <input
-              className="input"
-              value={s.externalController || ''}
-              placeholder="127.0.0.1:9090"
-              onChange={(e) => set('externalController', e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label>控制密码（secret）</label>
-            <input className="input" value={s.secret || ''} onChange={(e) => set('secret', e.target.value)} />
-          </div>
-          <div className="field">
-            <label>最终策略（MATCH 的落点）</label>
-            <select className="select" value={s.finalTarget || ''} onChange={(e) => set('finalTarget', e.target.value)}>
-              <option value="">跟随最后一个组</option>
-              {state.groups.map((g) => (
-                <option key={g.id} value={g.name}>
-                  {g.name}
-                </option>
-              ))}
-              <option value="DIRECT">DIRECT</option>
-            </select>
-          </div>
-          <div className="field">
             <label>订阅更新间隔（小时）</label>
             <input
               className="input"
@@ -165,7 +140,9 @@ export default function SettingsPage({ state, mutate }) {
           </div>
         </div>
         <div className="note" style={{ marginTop: 6 }}>
-          筛选后节点数见顶栏「节点」计数。正则语法与 Go 的 regexp 一致，不区分大小写可写 <code className="mono">(?i)</code>。
+          默认排除机场信息类节点：<code className="mono">客服|流量|到期|机场|剩余</code>（这一栏留空时会自动填回）。
+          筛选后节点数见顶栏「节点」计数。正则语法与 Go 的 regexp 一致，不区分大小写可写{' '}
+          <code className="mono">(?i)</code>。
         </div>
       </div>
 

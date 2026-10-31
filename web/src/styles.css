@@ -1,25 +1,4 @@
 :root {
-  --bg: #0a0b0d;
-  --bg-soft: #0e1013;
-  --panel: #131519;
-  --panel-2: #191c21;
-  --line: rgba(255, 255, 255, 0.075);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --text: #e8eaee;
-  --muted: #99a1ad;
-  --faint: #6a7280;
-  --accent: #5b8cff;
-  --accent-soft: rgba(91, 140, 255, 0.13);
-  --danger: #ff6b6b;
-  --danger-soft: rgba(255, 107, 107, 0.12);
-  --ok: #3ddc97;
-  --warn: #f5b544;
-  --radius: 14px;
-  --radius-sm: 9px;
-  color-scheme: dark;
-}
-
-[data-theme='light'] {
   --bg: #f5f6f8;
   --bg-soft: #eef0f3;
   --panel: #ffffff;
@@ -35,7 +14,28 @@
   --danger-soft: rgba(211, 59, 59, 0.09);
   --ok: #17925f;
   --warn: #a8730a;
+  --radius: 14px;
+  --radius-sm: 9px;
   color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #0a0b0d;
+  --bg-soft: #0e1013;
+  --panel: #131519;
+  --panel-2: #191c21;
+  --line: rgba(255, 255, 255, 0.075);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text: #e8eaee;
+  --muted: #99a1ad;
+  --faint: #6a7280;
+  --accent: #5b8cff;
+  --accent-soft: rgba(91, 140, 255, 0.13);
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.12);
+  --ok: #3ddc97;
+  --warn: #f5b544;
+  color-scheme: dark;
 }
 
 * {
@@ -419,6 +419,21 @@ textarea {
 
 .chip button:hover {
   color: var(--danger);
+}
+
+.chip {
+  cursor: grab;
+  user-select: none;
+}
+
+.chip.dragging {
+  opacity: 0.35;
+  cursor: grabbing;
+}
+
+.chip.drop-target {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .rules {

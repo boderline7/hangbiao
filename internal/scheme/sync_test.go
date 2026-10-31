@@ -116,8 +116,12 @@ func TestApplyUpstream(t *testing.T) {
 		st.RuleSets[2].Name != antiadRuleSet {
 		t.Errorf("规则集不对：%+v", st.RuleSets)
 	}
-	if st.Settings.FinalTarget != "🐟 漏网之鱼" {
-		t.Errorf("兜底策略不对：%s", st.Settings.FinalTarget)
+	// MATCH 落在最后一个组：ini 的 FINAL 组本来就在末尾，不需要额外设置项。
+	if st.Groups[len(st.Groups)-1].Name != "🐟 漏网之鱼" {
+		t.Errorf("FINAL 组应在最后，实际 %s", st.Groups[len(st.Groups)-1].Name)
+	}
+	if st.FinalTarget() != "🐟 漏网之鱼" {
+		t.Errorf("MATCH 应落到最后一个组，实际 %s", st.FinalTarget())
 	}
 }
 
@@ -132,10 +136,10 @@ func TestApplyUpstreamFillsMissingPolicy(t *testing.T) {
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "🛑 广告拦截") {
 		t.Errorf("应提示补了缺失的策略组：%v", warnings)
 	}
-	if len(st.Groups) != 2 || st.Groups[1].Name != "🛑 广告拦截" {
-		t.Fatalf("缺失的策略组应自动补上：%+v", st.Groups)
+	if len(st.Groups) != 2 || st.Groups[0].Name != "🛑 广告拦截" || st.Groups[1].Name != "🎯 全球直连" {
+		t.Fatalf("缺失的策略组应自动补上，且 FINAL 组应在最后：%+v", st.Groups)
 	}
-	if st.Rules[0].Position != st.Groups[1].ID {
+	if st.Rules[0].Position != st.Groups[0].ID {
 		t.Errorf("规则应挂到补出来的组上")
 	}
 }
@@ -191,23 +195,5 @@ func TestAssignPresetIDs(t *testing.T) {
 	}
 	if ids["ACL4SSR_Mini.ini"] == PresetMini {
 		t.Errorf("ACL4SSR_Mini.ini 不该占用核心精简方案 ID")
-	}
-}
-
-// 同步来的方案自带地区组，不应再按内置地区表追加。
-func TestSyncRegionsSkipsUpstreamLayout(t *testing.T) {
-	st := &model.State{
-		Groups:   []model.Group{{ID: "g1", Name: "🇭🇰 香港节点", Type: "url-test", Members: []string{}}},
-		Subs:     []model.Subscription{{Nodes: []model.Proxy{{"name": "香港 01"}, {"name": "日本 02"}}}},
-		Settings: model.Settings{PresetID: "acl4ssr-full@upstream"},
-	}
-	SyncRegions(st)
-	if len(st.Groups) != 1 {
-		t.Errorf("upstream 方案不应追加地区组，实际 %+v", st.Groups)
-	}
-	st.Settings.PresetID = "acl4ssr-full"
-	SyncRegions(st)
-	if len(st.Groups) < 2 {
-		t.Errorf("内置方案应生成地区组，实际 %+v", st.Groups)
 	}
 }

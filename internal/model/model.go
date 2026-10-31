@@ -120,8 +120,6 @@ type Subscription struct {
 type Settings struct {
 	Title              string `json:"title"`
 	MixedPort          int    `json:"mixedPort"`
-	ExternalController string `json:"externalController"`
-	Secret             string `json:"secret"`
 	Mode               string `json:"mode"`
 	LogLevel           string `json:"logLevel"`
 	AllowLAN           bool   `json:"allowLan"`
@@ -132,7 +130,6 @@ type Settings struct {
 	VerysyncDisabled   bool   `json:"verysyncDisabled,omitempty"`
 	BtDisabled         bool   `json:"btDisabled,omitempty"`
 	CommonOnlyDisabled bool   `json:"commonOnlyDisabled,omitempty"`
-	FinalTarget        string `json:"finalTarget"`
 	UpdateInterval     int    `json:"updateInterval"`
 	IPv6Disabled       bool   `json:"ipv6Disabled,omitempty"`
 	// FilterInclude / FilterExclude 是节点名正则，一行一条；包含为空表示全收，
@@ -296,11 +293,11 @@ func (s *State) rulesByGroupOrder() []Rule {
 	return append(out, orphan...)
 }
 
-// FinalTarget 返回 MATCH 的落点。
+// DefaultFilterExclude 是默认排除的机场信息类节点名（客服 / 流量 / 到期 / 机场 / 剩余）。
+const DefaultFilterExclude = `客服|流量|到期|机场|剩余`
+
+// FinalTarget 返回 MATCH 的落点：始终是最后一个策略组，不再单独维护一个设置项。
 func (s *State) FinalTarget() string {
-	if s.Settings.FinalTarget != "" {
-		return s.Settings.FinalTarget
-	}
 	if len(s.Groups) > 0 {
 		return s.Groups[len(s.Groups)-1].Name
 	}
@@ -408,6 +405,10 @@ func (s *State) Normalize() {
 	}
 	if s.Settings.Title == "" || s.Settings.Title == "塔台-docker" {
 		s.Settings.Title = "航标"
+	}
+	// 机场信息类节点（客服、流量、到期、机场、剩余）默认不参与导出。
+	if strings.TrimSpace(s.Settings.FilterExclude) == "" {
+		s.Settings.FilterExclude = DefaultFilterExclude
 	}
 }
 

@@ -142,7 +142,6 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 			cur.Rules = incoming.Rules
 			cur.RuleSets = incoming.RuleSets
 			cur.Settings = incoming.Settings
-			scheme.Upgrade(cur)
 			return nil
 		})
 		if err != nil {
@@ -156,18 +155,13 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePresets(w http.ResponseWriter) {
-	type presetInfo struct {
-		scheme.Preset
-	}
-	out := make([]presetInfo, 0, len(scheme.Presets))
-	for _, p := range scheme.Catalog() {
+	out := scheme.Catalog()
+	for i := range out {
 		probe := &model.State{}
-		if err := scheme.Apply(probe, p.ID); err == nil {
-			p.Groups = len(probe.Groups)
-			p.Rules = len(probe.Rules)
+		if err := scheme.Apply(probe, out[i].ID); err == nil {
+			out[i].Groups = len(probe.Groups)
+			out[i].Rules = len(probe.Rules)
 		}
-		p.Source = scheme.SourceOf(p.ID)
-		out = append(out, presetInfo{Preset: p})
 	}
 	writeJSON(w, 200, out)
 }
@@ -216,7 +210,6 @@ func (s *Server) handleAddSub(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.st.Update(func(st *model.State) error {
 		st.Subs = append(st.Subs, item)
-		scheme.SyncRegions(st)
 		return nil
 	}); err != nil {
 		fail(w, 500, err.Error())
@@ -284,7 +277,6 @@ func (s *Server) refreshAllSubs() (int, int) {
 				st.Subs[i].Error = ""
 			}
 		}
-		scheme.SyncRegions(st)
 		return nil
 	})
 	return len(items), failed
@@ -344,7 +336,6 @@ func (s *Server) handleSubAction(w http.ResponseWriter, r *http.Request, rest st
 				}
 			}
 			st.Subs = kept
-			scheme.SyncRegions(st)
 			return nil
 		})
 		if err != nil {
@@ -389,7 +380,6 @@ func (s *Server) handleSubAction(w http.ResponseWriter, r *http.Request, rest st
 					st.Subs[i].UpdatedAt = store.Now()
 				}
 			}
-			scheme.SyncRegions(st)
 			return nil
 		})
 		if err != nil {

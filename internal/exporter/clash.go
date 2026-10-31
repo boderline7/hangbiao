@@ -266,12 +266,6 @@ func Clash(st *model.State) (Result, error) {
 	appendKV(root, "ipv6", !st.Settings.IPv6Disabled)
 	appendKV(root, "unified-delay", true)
 	appendKV(root, "tcp-concurrent", true)
-	if st.Settings.ExternalController != "" {
-		appendKV(root, "external-controller", st.Settings.ExternalController)
-	}
-	if st.Settings.Secret != "" {
-		appendKV(root, "secret", st.Settings.Secret)
-	}
 
 	if !st.Settings.TunDisabled {
 		tun := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
@@ -320,7 +314,13 @@ func Clash(st *model.State) (Result, error) {
 		gn := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		appendKV(gn, "name", g.Name)
 		appendKV(gn, "type", g.Type)
-		appendKV(gn, "proxies", expandMembers(g, ref))
+		members := expandMembers(g, ref)
+		appendKV(gn, "proxies", members)
+		// select 组的默认选中项默认是 proxies 第一项；显式写 default-selected，
+		// 保证「组成员第一个」就是客户端首次加载时的选中项。
+		if g.Type == "select" {
+			appendKV(gn, "default-selected", members[0])
+		}
 		if g.Hidden {
 			appendKV(gn, "hidden", true)
 		}

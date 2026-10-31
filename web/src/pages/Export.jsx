@@ -183,8 +183,11 @@ export default function ExportPage({ state }) {
         </div>
         <div className="note">
           上面这份配置里，<code className="mono">rules:</code> 的先后完全由「分组」页的策略组顺序决定，
-          最后一条固定是 <code className="mono">MATCH,{state.settings.finalTarget || '最后一个组'}</code>。
-          想确认位置对不对，直接在预览里搜关键词即可，不用再去猜。
+          最后一条固定是{' '}
+          <code className="mono">
+            MATCH,{state.groups.length ? state.groups[state.groups.length - 1].name : 'DIRECT'}
+          </code>
+          （即列表里最后一个策略组）。想确认位置对不对，直接在预览里搜关键词即可，不用再去猜。
         </div>
       </div>
     </>

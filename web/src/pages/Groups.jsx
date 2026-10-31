@@ -38,7 +38,7 @@ function parseSite(input) {
 export default function Groups({ state, mutate, replace, toast, nodeNames }) {
   const [expanded, setExpanded] = useState(() => new Set())
   const [presets, setPresets] = useState([])
-  const [presetId, setPresetId] = useState('standard')
+  const [presetId, setPresetId] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -49,8 +49,14 @@ export default function Groups({ state, mutate, replace, toast, nodeNames }) {
   const loadPresets = () =>
     api
       .presets()
-      .then((list) => setPresets(list || []))
-      .catch(() => {})
+      .then((list) => {
+        const items = list || []
+        setPresets(items)
+        // 方案列表只包含已同步成功的方案；没有时下拉为空，不保留旧值。
+        setPresetId((cur) => (items.some((p) => p.id === cur) ? cur : items[0] ? items[0].id : ''))
+        return items
+      })
+      .catch(() => [])
 
   useEffect(() => {
     loadPresets()
@@ -110,9 +116,6 @@ export default function Groups({ state, mutate, replace, toast, nodeNames }) {
     mutate((s) => {
       s.groups = s.groups.filter((x) => x.id !== g.id)
       s.rules = s.rules.filter((r) => r.position !== g.id)
-      if (s.settings.finalTarget === g.name) {
-        s.settings.finalTarget = s.groups.length ? s.groups[s.groups.length - 1].name : 'DIRECT'
-      }
     })
   }
 
@@ -131,6 +134,10 @@ export default function Groups({ state, mutate, replace, toast, nodeNames }) {
   }
 
   const applyPreset = async () => {
+    if (!presetId) {
+      toast('请先点「同步 ACL4SSR」并成功找到方案', 'error')
+      return
+    }
     if (!window.confirm('载入方案会覆盖当前的分组、规则和规则集，订阅与节点保留。继续？')) return
     try {
       const next = await api.applyPreset(presetId)
@@ -152,23 +159,37 @@ export default function Groups({ state, mutate, replace, toast, nodeNames }) {
           <button className="btn" onClick={syncPresets} disabled={syncing}>
             {syncing ? '同步中…' : '同步 ACL4SSR'}
           </button>
-          <select className="select" value={presetId} onChange={(e) => setPresetId(e.target.value)}>
-            {presets.length === 0 && <option value="standard">标准</option>}
+          <select
+            className="select"
+            value={presetId}
+            onChange={(e) => setPresetId(e.target.value)}
+            disabled={presets.length === 0}
+          >
+            {presets.length === 0 && <option value="">尚未同步</option>}
             {presets.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
-                {p.source === 'upstream' ? '（上游同步）' : ''} · {p.groups} 组 / {p.rules} 条
+                {p.name} · {p.groups} 组 / {p.rules} 条
               </option>
             ))}
           </select>
-          <button className="btn" onClick={applyPreset}>
+          <button className="btn" onClick={applyPreset} disabled={!presetId}>
             载入
           </button>
         </div>
-        <div className="note">
-          列表里的先后顺序就是客户端的匹配优先级：靠上的组先命中。把「广告拦截」拖到「全球直连」上面，它的规则就会排在 CN
-          直连之前；拖到最下面则几乎不会生效。
-        </div>
+        {presets.length === 0 ? (
+          <div className="empty">
+            还没有同步到 ACL4SSR，所以这里不显示任何方案与分组。点「同步 ACL4SSR」成功之后才会出现，
+            避免把没同步下来的分组导出给客户端。
+          </div>
+        ) : (
+          <div className="note">
+            已同步 ACL4SSR{' '}
+            {presets[0].revision ? presets[0].revision.slice(0, 7) : ''}
+            {presets[0].fetchedAt ? ` · 同步于 ${presets[0].fetchedAt}` : ''}。载入后，列表里的先后顺序
+            就是客户端的匹配优先级：靠上的组先命中。把「广告拦截」拖到「全球直连」上面，它的规则就会排在
+            CN 直连之前；拖到最下面则几乎不会生效。
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -291,6 +312,8 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
   const [value, setValue] = useState('')
   const [target, setTarget] = useState('')
   const [site, setSite] = useState('')
+  const [dragMember, setDragMember] = useState(null)
+  const [overMember, setOverMember] = useState(null)
 
   const memberSet = new Set(group.members || [])
   const memberOptions = []
@@ -313,6 +336,16 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
       const g = s.groups.find((x) => x.id === group.id)
       if (g) g.members = fn(g.members || [])
     })
+
+  const moveMember = (from, to) => {
+    if (from === null || to === null || from === to) return
+    setMembers((list) => {
+      const next = [...list]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
+  }
 
   const addRule = (rule) => {
     if (!rule.value) return
@@ -347,10 +380,42 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
   return (
     <div className="group-body">
       <div>
-        <div className="section-label">成员</div>
+        <div className="section-label">
+          成员（拖动可调整顺序{group.type === 'select' ? '，第一个成员即客户端默认选中项' : ''}）
+        </div>
         <div className="chips">
-          {(group.members || []).map((m) => (
-            <span className="chip" key={m}>
+          {(group.members || []).map((m, i) => (
+            <span
+              className={
+                'chip' +
+                (dragMember === i ? ' dragging' : '') +
+                (overMember === i && dragMember !== null && dragMember !== i ? ' drop-target' : '')
+              }
+              key={m + ':' + i}
+              draggable
+              onDragStart={(e) => {
+                setDragMember(i)
+                setOverMember(i)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragOver={(e) => {
+                if (dragMember === null) return
+                e.preventDefault()
+                setOverMember(i)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                moveMember(dragMember, i)
+                setDragMember(null)
+                setOverMember(null)
+              }}
+              onDragEnd={() => {
+                setDragMember(null)
+                setOverMember(null)
+              }}
+              title="按住拖动调整顺序"
+            >
+              {group.type === 'select' && i === 0 && <span className="badge accent">默认</span>}
               <span>{m === '$nodes' ? '全部节点' : m === '$groups' ? '全部策略组' : m === '$regions' ? '全部地区组' : m}</span>
               <button onClick={() => setMembers((list) => list.filter((x) => x !== m))} title="移除">
                 ✕

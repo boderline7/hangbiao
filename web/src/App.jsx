@@ -18,7 +18,8 @@ export default function App() {
   const [state, setState] = useState(null)
   const [tab, setTab] = useState('groups')
   const [toast, setToast] = useState(null)
-  const [theme, setTheme] = useState(() => localStorage.getItem('td-theme') || 'dark')
+  // 默认浅色：旧的 td-theme 键把上一版默认的深色记住了，换新键让已有浏览器也回到浅色。
+  const [theme, setTheme] = useState(() => localStorage.getItem('td-theme-v2') || 'light')
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const timer = useRef(null)
@@ -31,7 +32,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    localStorage.setItem('td-theme', theme)
+    localStorage.setItem('td-theme-v2', theme)
   }, [theme])
 
   const showToast = useCallback((msg, kind = 'ok') => {
