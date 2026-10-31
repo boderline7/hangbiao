@@ -380,8 +380,12 @@ func (s *State) Normalize() {
 		if s.RuleSets[i].Behavior == "" {
 			s.RuleSets[i].Behavior = "domain"
 		}
+		// ACL4SSR 的 .list 都是纯文本规则行，按 yaml 解析会报 payload 缺失。
+		if s.RuleSets[i].Format == "yaml" && strings.HasSuffix(s.RuleSets[i].URL, ".list") {
+			s.RuleSets[i].Format = "text"
+		}
 		if s.RuleSets[i].Format == "" {
-			s.RuleSets[i].Format = "yaml"
+			s.RuleSets[i].Format = "text"
 		}
 		if s.RuleSets[i].Interval == 0 {
 			s.RuleSets[i].Interval = 86400
