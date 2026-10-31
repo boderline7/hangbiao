@@ -71,7 +71,7 @@ func setMirror(prefix string) {
 	mirrorMu.Unlock()
 }
 
-// Detect 依次探测候选源并缓存第一个可用的前缀；全部失败时保留原值。
+// Detect 并发探测候选源，取最先成功的那个并缓存；全部失败时保留原值。
 func Detect(ctx context.Context) string {
 	mirrorMu.Lock()
 	if mirrorBusy {
@@ -90,10 +90,22 @@ func Detect(ctx context.Context) string {
 	probeCtx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
 
+	type result struct{ prefix string }
+	ch := make(chan result, len(ACLMirrors))
 	for _, prefix := range ACLMirrors {
-		if _, err := get(probeCtx, prefix+probeURL); err == nil {
-			setMirror(prefix)
-			return prefix
+		go func(prefix string) {
+			if _, err := get(probeCtx, prefix+probeURL); err == nil {
+				ch <- result{prefix}
+			}
+		}(prefix)
+	}
+	for range ACLMirrors {
+		select {
+		case r := <-ch:
+			setMirror(r.prefix)
+			return r.prefix
+		case <-probeCtx.Done():
+			return Mirror()
 		}
 	}
 	return Mirror()
