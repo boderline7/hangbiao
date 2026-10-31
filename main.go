@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"flag"
 	"io/fs"
@@ -16,6 +17,7 @@ import (
 	"towerdocker/internal/model"
 	"towerdocker/internal/scheme"
 	"towerdocker/internal/store"
+	"towerdocker/internal/sub"
 )
 
 //go:embed all:web/dist
@@ -59,6 +61,13 @@ func main() {
 
 	engine := api.New(st, static)
 	go engine.AutoRefresh()
+	// 启动后探测 GitHub raw 加速源，并每 30 分钟复核一次；导出时按结果改写规则集地址。
+	go func() {
+		for {
+			sub.Detect(context.Background())
+			time.Sleep(30 * time.Minute)
+		}
+	}()
 	srv := &http.Server{
 		Addr:              *addr,
 		Handler:           engine,

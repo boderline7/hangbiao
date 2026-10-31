@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"towerdocker/internal/model"
+	"towerdocker/internal/sub"
 )
 
 // 运行时同步：直接从 ACL4SSR 上游拉 Clash/config 下全部 ini，解析出
@@ -367,6 +368,14 @@ func writeCache(p string, c syncCache) error {
 }
 
 func githubGet(ctx context.Context, client *http.Client, url string) ([]byte, error) {
+	// raw 链接按可用加速源自动改写，raw.githubusercontent.com 在部分网络不可达。
+	if sub.IsGitHubRaw(url) {
+		body, _, err := sub.Fetch(ctx, url)
+		if err != nil {
+			return nil, fmt.Errorf("拉取失败：%w", err)
+		}
+		return body, nil
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

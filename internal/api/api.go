@@ -108,6 +108,8 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 	case route == "subs/refresh" && r.Method == http.MethodPost:
 		s.refreshAllSubs()
 		writeState(w, s.st.Get())
+	case route == "rulesets/check" && r.Method == http.MethodPost:
+		writeJSON(w, 200, s.checkRuleSets(r.Context()))
 	case strings.HasPrefix(route, "subs/"):
 		s.handleSubAction(w, r, strings.TrimPrefix(route, "subs/"))
 	case route == "export":
@@ -117,6 +119,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 			"ok":              true,
 			"time":            time.Now().Format(time.RFC3339),
 			"acl4ssrRevision": scheme.Revision(),
+			"ruleSource":      sub.Mirror(),
 		})
 	default:
 		fail(w, 404, "not found")
@@ -284,6 +287,44 @@ func (s *Server) refreshAllSubs() (int, int) {
 		return nil
 	})
 	return len(items), failed
+}
+
+type ruleSetCheckItem struct {
+	Name   string `json:"name"`
+	OK     bool   `json:"ok"`
+	Bytes  int    `json:"bytes"`
+	Mirror string `json:"mirror,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+type ruleSetCheckResp struct {
+	Mirror string             `json:"mirror"`
+	Total  int                `json:"total"`
+	OK     int                `json:"ok"`
+	Items  []ruleSetCheckItem `json:"items"`
+}
+
+// checkRuleSets 逐个拉取规则集，返回每个规则集的可用性和实际使用的加速源。
+func (s *Server) checkRuleSets(ctx context.Context) ruleSetCheckResp {
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	st := s.st.Get()
+	res := ruleSetCheckResp{Mirror: sub.Detect(ctx), Total: len(st.RuleSets)}
+	res.Items = make([]ruleSetCheckItem, 0, len(st.RuleSets))
+	for _, rs := range st.RuleSets {
+		body, mirror, err := sub.Fetch(ctx, rs.URL)
+		item := ruleSetCheckItem{Name: rs.Name, OK: err == nil, Bytes: len(body), Mirror: mirror}
+		if err != nil {
+			item.Error = err.Error()
+		} else {
+			res.OK++
+			if mirror != "" {
+				res.Mirror = mirror
+			}
+		}
+		res.Items = append(res.Items, item)
+	}
+	return res
 }
 
 func (s *Server) handleSubAction(w http.ResponseWriter, r *http.Request, rest string) {

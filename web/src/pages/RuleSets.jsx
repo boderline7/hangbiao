@@ -1,11 +1,15 @@
 import { useState } from 'react'
 
+import { api } from '../api'
+
 export default function RuleSets({ state, mutate, toast }) {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [behavior, setBehavior] = useState('domain')
   const [format, setFormat] = useState('yaml')
   const [interval, setIntervalValue] = useState('86400')
+  const [checking, setChecking] = useState(false)
+  const [checks, setChecks] = useState({})
 
   const used = new Set()
   for (const r of state.rules) {
@@ -36,12 +40,36 @@ export default function RuleSets({ state, mutate, toast }) {
     setUrl('')
   }
 
+  // 逐个拉取规则集，显示成功/失败与实际使用的加速源。
+  const check = async () => {
+    setChecking(true)
+    try {
+      const res = await api.checkRuleSets()
+      const map = {}
+      for (const it of res.items) map[it.name] = it
+      setChecks(map)
+      const via = res.mirror ? res.mirror.replace(/^https:\/\//, '').replace(/\/$/, '') : '直连 GitHub'
+      const okAll = res.ok === res.total
+      toast(
+        okAll ? `拉取成功 ${res.ok}/${res.total}（${via}）` : `拉取完成：成功 ${res.ok}/${res.total}（${via}）`,
+        okAll ? 'ok' : 'error'
+      )
+    } catch (e) {
+      toast(e.message, 'error')
+    } finally {
+      setChecking(false)
+    }
+  }
+
   return (
     <>
       <div className="card">
         <div className="card-head">
           <h2>规则集（rule-providers）</h2>
           <span className="hint">规则里用 RULE-SET,&lt;名称&gt;,&lt;目标&gt; 引用</span>
+          <button className="btn" onClick={check} disabled={checking} style={{ marginLeft: 'auto' }}>
+            {checking ? '拉取检测中…' : '检测拉取'}
+          </button>
         </div>
 
         <div className="row" style={{ marginBottom: 14 }}>
@@ -108,7 +136,19 @@ export default function RuleSets({ state, mutate, toast }) {
                     {rs.url}
                   </td>
                   <td>{Math.round((rs.interval || 0) / 60)} 分</td>
-                  <td>{used.has(rs.name) ? <span className="badge ok">被引用</span> : <span className="badge">未引用</span>}</td>
+                  <td>
+                    {used.has(rs.name) ? <span className="badge ok">被引用</span> : <span className="badge">未引用</span>}
+                    {checks[rs.name] &&
+                      (checks[rs.name].ok ? (
+                        <span className="badge ok" title={checks[rs.name].mirror || '直连 GitHub'}>
+                          拉取成功 {Math.round(checks[rs.name].bytes / 1024)} KB
+                        </span>
+                      ) : (
+                        <span className="badge danger" title={checks[rs.name].error}>
+                          拉取失败
+                        </span>
+                      ))}
+                  </td>
                   <td style={{ textAlign: 'right' }}>
                     <button
                       className="icon-btn danger"

@@ -13,6 +13,7 @@ import (
 
 	"towerdocker/internal/model"
 	"towerdocker/internal/scheme"
+	"towerdocker/internal/sub"
 )
 
 type Result struct {
@@ -350,7 +351,7 @@ func Clash(st *model.State) (Result, error) {
 		if rs.Format != "" {
 			appendKV(inner, "format", rs.Format)
 		}
-		appendKV(inner, "url", rs.URL)
+		appendKV(inner, "url", sub.RewriteURL(rs.URL))
 		appendKV(inner, "path", rs.Path)
 		appendKV(inner, "interval", rs.Interval)
 		appendNode(rp, rs.Name, inner)

@@ -35,6 +35,7 @@ export const api = {
     request('/api/subs', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(payload) }),
   refreshSub: (id) => request(`/api/subs/${id}/refresh`, { method: 'POST' }),
   refreshAllSubs: () => request('/api/subs/refresh', { method: 'POST' }),
+  checkRuleSets: () => request('/api/rulesets/check', { method: 'POST' }),
   deleteSub: (id) => request(`/api/subs/${id}`, { method: 'DELETE' }),
   exportConfig: (format) => request(`/api/export?format=${encodeURIComponent(format)}`),
   downloadUrl: (format) => `/api/export?format=${encodeURIComponent(format)}&download=1`,
