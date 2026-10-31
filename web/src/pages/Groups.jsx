@@ -271,6 +271,7 @@ export default function Groups({ state, mutate, replace, toast, nodeNames }) {
                 nodeNames={nodeNames}
                 mutate={mutate}
                 toast={toast}
+                ruleSets={state.ruleSets}
               />
             )}
           </div>
@@ -285,7 +286,7 @@ function labelOfType(t) {
   return hit ? hit[1] : t || '手动选择'
 }
 
-function GroupBody({ group, groups, rules, nodeNames, mutate, toast }) {
+function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets }) {
   const [type, setType] = useState('DOMAIN-SUFFIX')
   const [value, setValue] = useState('')
   const [target, setTarget] = useState('')
@@ -463,7 +464,7 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast }) {
               onChange={(e) => setValue(e.target.value)}
             >
               <option value="">选择规则集…</option>
-              {(state.ruleSets || []).map((rs) => (
+              {(ruleSets || []).map((rs) => (
                 <option key={rs.id} value={rs.name}>
                   {rs.name}
                 </option>
