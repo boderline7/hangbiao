@@ -65,6 +65,8 @@ func (s *Store) Update(fn func(*model.State) error) error {
 	if err := fn(next); err != nil {
 		return err
 	}
+	// 每次写回都清一遍悬空引用，保证节点、分组、成员三者总是联动。
+	next.PruneMembers()
 	next.Normalize()
 	s.state = next
 	return s.flush()

@@ -421,6 +421,16 @@ textarea {
   color: var(--danger);
 }
 
+.chip button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* 触屏上 ↑/↓ 是保底手段，悬停色不该套用 */
+.chip button:disabled:hover {
+  color: inherit;
+}
+
 .chip {
   cursor: grab;
   user-select: none;

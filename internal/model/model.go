@@ -232,6 +232,38 @@ func (s *State) AttachNodes(before []string) {
 	}
 }
 
+// PruneMembers 清掉成员里已经不存在的节点与策略组引用。
+// 删除订阅/节点、修改节点筛选条件之后，分组成员会跟着自动消失，不留悬空 chip。
+func (s *State) PruneMembers() {
+	nodeSet := make(map[string]bool, len(s.Subs))
+	for _, n := range s.NodeNames() {
+		nodeSet[n] = true
+	}
+	groupSet := make(map[string]bool, len(s.Groups))
+	for _, g := range s.Groups {
+		groupSet[g.Name] = true
+	}
+	for i := range s.Groups {
+		g := &s.Groups[i]
+		if len(g.Members) == 0 {
+			continue
+		}
+		kept := make([]string, 0, len(g.Members))
+		for _, m := range g.Members {
+			switch {
+			case m == "$nodes", m == "$groups", m == "$regions", m == "DIRECT", m == "REJECT":
+				kept = append(kept, m)
+			case nodeSet[m] || groupSet[m]:
+				kept = append(kept, m)
+			}
+		}
+		if len(kept) == 0 {
+			kept = []string{"DIRECT"}
+		}
+		g.Members = kept
+	}
+}
+
 // filterCache 缓存已编译的正则，避免每次导出都重新 Compile。
 var filterCache sync.Map
 

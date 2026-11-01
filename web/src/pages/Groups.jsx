@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api.js'
 
+// 触屏设备上 HTML5 draggable 基本不生效（iOS 长按还会弹原生拖拽），
+// 这类设备走 pointer 拖拽，并额外给上移/下移按钮保底。
+const COARSE_POINTER =
+  typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false
+
 const RULE_TYPES = [
   'DOMAIN-SUFFIX',
   'DOMAIN',
@@ -350,9 +355,24 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
     })
   }
 
+  // 触屏保底：点 ↑/↓ 交换相邻成员
+  const moveMemberBy = (i, dir) => {
+    setMembers((list) => {
+      const to = i + dir
+      if (to < 0 || to >= list.length) return list
+      const next = [...list]
+      const tmp = next[i]
+      next[i] = next[to]
+      next[to] = tmp
+      return next
+    })
+  }
+
   const onChipPointerDown = (e, i) => {
     // 鼠标沿用 HTML5 draggable，触屏/手写笔走下面的 pointer 拖拽。
     if (e.pointerType === 'mouse') return
+    // 按到 ✕ / 上下移按钮时不要触发拖拽
+    if (e.target.closest && e.target.closest('button')) return
     suppressTap.current = false
     touchDrag.current = { active: true, pointerId: e.pointerId, from: i, to: i, moved: false }
     setDragMember(i)
@@ -429,7 +449,7 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
     <div className="group-body">
       <div>
         <div className="section-label">
-          成员（拖动可调整顺序{group.type === 'select' ? '，第一个成员即客户端默认选中项' : ''}）
+          成员（拖动或点 ↑↓ 调整顺序{group.type === 'select' ? '，第一个成员即客户端默认选中项' : ''}）
         </div>
         <div className="chips">
           {(group.members || []).map((m, i) => (
@@ -441,7 +461,7 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
               }
               key={m + ':' + i}
               data-idx={i}
-              draggable
+              draggable={!COARSE_POINTER}
               onPointerDown={(e) => onChipPointerDown(e, i)}
               onPointerMove={onChipPointerMove}
               onPointerUp={(e) => onChipPointerEnd(e, true)}
@@ -470,6 +490,20 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
             >
               {group.type === 'select' && i === 0 && <span className="badge accent">默认</span>}
               <span>{m === '$nodes' ? '全部节点' : m === '$groups' ? '全部策略组' : m === '$regions' ? '全部地区组' : m}</span>
+              {COARSE_POINTER && (
+                <>
+                  <button onClick={() => moveMemberBy(i, -1)} disabled={i === 0} title="上移">
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveMemberBy(i, 1)}
+                    disabled={i === (group.members || []).length - 1}
+                    title="下移"
+                  >
+                    ↓
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => {
                   // 刚拖动过就别当成点击，否则松手会误删成员
