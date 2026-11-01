@@ -180,6 +180,58 @@ func (s *State) Nodes() []Proxy {
 	return out
 }
 
+// AttachNodes 把新增节点追加到「原本收全了所有节点」的策略组末尾，before 为变更前的节点名单。
+// 手动添加的单节点、订阅刷新出来的节点因此不用重新载入方案就会出现在节点选择组里；
+// 只收部分节点的组（比如按地区过滤的组）不会被塞进新节点。
+func (s *State) AttachNodes(before []string) {
+	if len(before) == 0 {
+		return
+	}
+	beforeSet := make(map[string]bool, len(before))
+	for _, n := range before {
+		beforeSet[n] = true
+	}
+	cur := s.NodeNames()
+	added := make([]string, 0, len(cur))
+	for _, n := range cur {
+		if !beforeSet[n] {
+			added = append(added, n)
+		}
+	}
+	if len(added) == 0 {
+		return
+	}
+	for i := range s.Groups {
+		g := &s.Groups[i]
+		switch g.Type {
+		case "select", "url-test", "fallback", "load-balance":
+		default:
+			continue
+		}
+		seen := make(map[string]bool, len(g.Members)+len(added))
+		for _, m := range g.Members {
+			seen[m] = true
+		}
+		ok := true
+		for _, n := range before {
+			if !seen[n] {
+				ok = false
+				break
+			}
+		}
+		if !ok {
+			continue
+		}
+		for _, n := range added {
+			if seen[n] {
+				continue
+			}
+			seen[n] = true
+			g.Members = append(g.Members, n)
+		}
+	}
+}
+
 // filterCache 缓存已编译的正则，避免每次导出都重新 Compile。
 var filterCache sync.Map
 

@@ -424,6 +424,10 @@ textarea {
 .chip {
   cursor: grab;
   user-select: none;
+  /* 触屏拖动成员时不要让浏览器把手势当成页面滚动 */
+  touch-action: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .chip.dragging {

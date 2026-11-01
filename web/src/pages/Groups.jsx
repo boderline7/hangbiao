@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api.js'
 
 const RULE_TYPES = [
@@ -45,6 +45,9 @@ export default function Groups({ state, mutate, replace, toast, nodeNames }) {
   const [newType, setNewType] = useState('select')
   const [dragIndex, setDragIndex] = useState(null)
   const [overIndex, setOverIndex] = useState(null)
+  // 触屏拖拽状态：HTML5 的 draggable 在手机上不生效，这里用 pointer 事件补一套。
+  const touchDrag = useRef({ active: false, pointerId: 0, from: 0, to: 0, moved: false })
+  const suppressTap = useRef(false)
 
   const loadPresets = () =>
     api
@@ -347,6 +350,51 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
     })
   }
 
+  const onChipPointerDown = (e, i) => {
+    // 鼠标沿用 HTML5 draggable，触屏/手写笔走下面的 pointer 拖拽。
+    if (e.pointerType === 'mouse') return
+    suppressTap.current = false
+    touchDrag.current = { active: true, pointerId: e.pointerId, from: i, to: i, moved: false }
+    setDragMember(i)
+    setOverMember(i)
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // 个别浏览器不支持捕获，忽略即可
+    }
+  }
+
+  const onChipPointerMove = (e) => {
+    const t = touchDrag.current
+    if (!t.active || e.pointerId !== t.pointerId) return
+    e.preventDefault()
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const chip = el && el.closest ? el.closest('.chip[data-idx]') : null
+    if (!chip) return
+    const idx = Number(chip.getAttribute('data-idx'))
+    if (!Number.isInteger(idx)) return
+    if (idx !== t.to) {
+      t.to = idx
+      setOverMember(idx)
+    }
+    if (idx !== t.from) t.moved = true
+  }
+
+  const onChipPointerEnd = (e, commit) => {
+    const t = touchDrag.current
+    if (!t.active || e.pointerId !== t.pointerId) return
+    t.active = false
+    try {
+      e.currentTarget.releasePointerCapture(t.pointerId)
+    } catch {
+      // 忽略
+    }
+    if (commit && t.moved) moveMember(t.from, t.to)
+    suppressTap.current = t.moved
+    setDragMember(null)
+    setOverMember(null)
+  }
+
   const addRule = (rule) => {
     if (!rule.value) return
     mutate((s) => {
@@ -392,7 +440,12 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
                 (overMember === i && dragMember !== null && dragMember !== i ? ' drop-target' : '')
               }
               key={m + ':' + i}
+              data-idx={i}
               draggable
+              onPointerDown={(e) => onChipPointerDown(e, i)}
+              onPointerMove={onChipPointerMove}
+              onPointerUp={(e) => onChipPointerEnd(e, true)}
+              onPointerCancel={(e) => onChipPointerEnd(e, false)}
               onDragStart={(e) => {
                 setDragMember(i)
                 setOverMember(i)
@@ -417,7 +470,17 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
             >
               {group.type === 'select' && i === 0 && <span className="badge accent">默认</span>}
               <span>{m === '$nodes' ? '全部节点' : m === '$groups' ? '全部策略组' : m === '$regions' ? '全部地区组' : m}</span>
-              <button onClick={() => setMembers((list) => list.filter((x) => x !== m))} title="移除">
+              <button
+                onClick={() => {
+                  // 刚拖动过就别当成点击，否则松手会误删成员
+                  if (suppressTap.current) {
+                    suppressTap.current = false
+                    return
+                  }
+                  setMembers((list) => list.filter((x) => x !== m))
+                }}
+                title="移除"
+              >
                 ✕
               </button>
             </span>

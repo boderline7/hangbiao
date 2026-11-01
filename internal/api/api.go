@@ -208,8 +208,10 @@ func (s *Server) handleAddSub(w http.ResponseWriter, r *http.Request) {
 		Traffic:     traffic,
 		TrafficText: trafficText,
 	}
+	beforeNames := s.st.Get().NodeNames()
 	if err := s.st.Update(func(st *model.State) error {
 		st.Subs = append(st.Subs, item)
+		st.AttachNodes(beforeNames)
 		return nil
 	}); err != nil {
 		fail(w, 500, err.Error())
@@ -259,6 +261,7 @@ func (s *Server) refreshAllSubs() (int, int) {
 		}
 	}
 	now := store.Now()
+	beforeNames := cur.NodeNames()
 	_ = s.st.Update(func(st *model.State) error {
 		for _, it := range items {
 			for i := range st.Subs {
@@ -277,6 +280,7 @@ func (s *Server) refreshAllSubs() (int, int) {
 				st.Subs[i].Error = ""
 			}
 		}
+		st.AttachNodes(beforeNames)
 		return nil
 	})
 	return len(items), failed
@@ -369,6 +373,7 @@ func (s *Server) handleSubAction(w http.ResponseWriter, r *http.Request, rest st
 			fail(w, 502, "刷新失败："+err.Error())
 			return
 		}
+		beforeNames := cur.NodeNames()
 		err = s.st.Update(func(st *model.State) error {
 			for i := range st.Subs {
 				if st.Subs[i].ID == id {
@@ -380,6 +385,7 @@ func (s *Server) handleSubAction(w http.ResponseWriter, r *http.Request, rest st
 					st.Subs[i].UpdatedAt = store.Now()
 				}
 			}
+			st.AttachNodes(beforeNames)
 			return nil
 		})
 		if err != nil {
