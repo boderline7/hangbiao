@@ -666,6 +666,14 @@ func applyUpstream(st *model.State, def upstreamDef) []string {
 		warnings = append(warnings, fmt.Sprintf("GEOIP 规则的组「%s」在 ini 里没有定义", def.GeoIPTarget))
 	}
 
+	// 方案重建分组前先记住同名组的手工筛选，避免同步上游时被清掉。
+	oldFilters := map[string]model.Group{}
+	for _, g := range st.Groups {
+		if g.FilterInclude != "" || g.FilterExclude != "" {
+			oldFilters[g.Name] = g
+		}
+	}
+
 	st.Groups = nil
 	st.Rules = nil
 	st.RuleSets = nil
@@ -673,6 +681,10 @@ func applyUpstream(st *model.State, def upstreamDef) []string {
 
 	for _, gd := range def.Groups {
 		g := model.Group{ID: model.NewID(), Name: gd.Name, Type: gd.Type}
+		if old, ok := oldFilters[gd.Name]; ok {
+			g.FilterInclude = old.FilterInclude
+			g.FilterExclude = old.FilterExclude
+		}
 		if g.Type == "" {
 			g.Type = "select"
 		}

@@ -50,9 +50,6 @@ export default function Groups({ state, mutate, replace, toast, nodeNames }) {
   const [newType, setNewType] = useState('select')
   const [dragIndex, setDragIndex] = useState(null)
   const [overIndex, setOverIndex] = useState(null)
-  // 触屏拖拽状态：HTML5 的 draggable 在手机上不生效，这里用 pointer 事件补一套。
-  const touchDrag = useRef({ active: false, pointerId: 0, from: 0, to: 0, moved: false })
-  const suppressTap = useRef(false)
 
   const loadPresets = () =>
     api
@@ -322,6 +319,9 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
   const [site, setSite] = useState('')
   const [dragMember, setDragMember] = useState(null)
   const [overMember, setOverMember] = useState(null)
+  // 触屏拖拽状态：HTML5 的 draggable 在手机上不生效，这里用 pointer 事件补一套。
+  const touchDrag = useRef({ active: false, pointerId: 0, from: 0, to: 0, moved: false })
+  const suppressTap = useRef(false)
 
   const memberSet = new Set(group.members || [])
   const memberOptions = []
@@ -344,6 +344,44 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
       const g = s.groups.find((x) => x.id === group.id)
       if (g) g.members = fn(g.members || [])
     })
+
+  const setFilter = (field, value) =>
+    mutate((s) => {
+      const g = s.groups.find((x) => x.id === group.id)
+      if (g) g[field] = value
+    })
+
+  // 与后端保持一致：每行一条正则，非法正则直接忽略；先包含后排除。
+  // 筛选只作用于节点（"全部节点"展开的与手选的都算），DIRECT/REJECT/策略组名不受影响。
+  // 界面按同一规则实时隐藏被筛掉的节点，导出时后端也按此过滤。
+  const filterRules = useMemo(() => {
+    const parse = (text) =>
+      (text || '')
+        .split('\n')
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .map((x) => {
+          try {
+            return new RegExp(x)
+          } catch {
+            return null
+          }
+        })
+        .filter(Boolean)
+    const inc = parse(group.filterInclude)
+    const exc = parse(group.filterExclude)
+    const allows = (n) => {
+      if (inc.length && !inc.some((re) => re.test(n))) return false
+      if (exc.some((re) => re.test(n))) return false
+      return true
+    }
+    const nodeSet = new Set(nodeNames)
+    let hidden = 0
+    for (const m of group.members || []) {
+      if (nodeSet.has(m) && !allows(m)) hidden++
+    }
+    return { allows, nodeSet, hidden }
+  }, [group.members, group.filterInclude, group.filterExclude, nodeNames])
 
   const moveMember = (from, to) => {
     if (from === null || to === null || from === to) return
@@ -452,7 +490,10 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
           成员（拖动或点 ↑↓ 调整顺序{group.type === 'select' ? '，第一个成员即客户端默认选中项' : ''}）
         </div>
         <div className="chips">
-          {(group.members || []).map((m, i) => (
+          {(group.members || [])
+            .map((m, i) => ({ m, i }))
+            .filter(({ m }) => !(filterRules.nodeSet.has(m) && !filterRules.allows(m)))
+            .map(({ m, i }) => (
             <span
               className={
                 'chip' +
@@ -537,6 +578,33 @@ function GroupBody({ group, groups, rules, nodeNames, mutate, toast, ruleSets })
             ))}
           </select>
         </div>
+      </div>
+
+      <div>
+        <div className="section-label">节点筛选（每行一条正则，只作用于节点）</div>
+        <div className="row" style={{ alignItems: 'stretch' }}>
+          <textarea
+            className="input"
+            rows={2}
+            style={{ flex: 1, minWidth: 180, resize: 'vertical' }}
+            placeholder="包含：如 香港|HK，留空表示不限制"
+            value={group.filterInclude || ''}
+            onChange={(e) => setFilter('filterInclude', e.target.value)}
+          />
+          <textarea
+            className="input"
+            rows={2}
+            style={{ flex: 1, minWidth: 180, resize: 'vertical' }}
+            placeholder="不包含：如 过期|试用"
+            value={group.filterExclude || ''}
+            onChange={(e) => setFilter('filterExclude', e.target.value)}
+          />
+        </div>
+        {filterRules.hidden > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--muted, #888)', marginTop: 6 }}>
+            {`已按筛选隐藏 ${filterRules.hidden} 个节点（直连、策略组等不受影响）`}
+          </div>
+        )}
       </div>
 
       <div>

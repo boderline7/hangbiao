@@ -154,6 +154,11 @@ func expandMembers(g model.Group, r refs) []string {
 		if name == "" || name == g.Name || seen[name] {
 			return
 		}
+		// 分组的包含/不包含筛选对所有节点成员生效（"全部节点"与手选节点一视同仁），
+		// 策略组名与 DIRECT/REJECT 等特殊目标不受影响。
+		if knownNode[name] && !g.AllowsNode(name) {
+			return
+		}
 		seen[name] = true
 		out = append(out, name)
 	}

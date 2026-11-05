@@ -71,6 +71,11 @@ type Group struct {
 	Note     string   `json:"note,omitempty"`
 	// Hidden 对应 mihomo 的 hidden: true，用于地区组的「延迟优选」等内部组。
 	Hidden bool `json:"hidden,omitempty"`
+	// FilterInclude / FilterExclude 是本组对节点成员的正则筛选，一行一条。
+	// 包含为空表示不限制；"全部节点"展开的节点与手工加入的节点都参与筛选，
+	// DIRECT/REJECT 等特殊目标与策略组名不参与。
+	FilterInclude string `json:"filterInclude,omitempty"`
+	FilterExclude string `json:"filterExclude,omitempty"`
 }
 
 // Rule 一条规则。Position 决定它在导出结果中的位置（哪个组的段里），
@@ -303,6 +308,28 @@ func (s *State) nodeAllowed(name string) bool {
 		}
 	}
 	for _, re := range compilePatterns(s.Settings.FilterExclude) {
+		if re.MatchString(name) {
+			return false
+		}
+	}
+	return true
+}
+
+// AllowsNode 判断节点名是否通过本组的包含/排除筛选，规则与全局筛选一致。
+func (g Group) AllowsNode(name string) bool {
+	if inc := compilePatterns(g.FilterInclude); len(inc) > 0 {
+		matched := false
+		for _, re := range inc {
+			if re.MatchString(name) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	for _, re := range compilePatterns(g.FilterExclude) {
 		if re.MatchString(name) {
 			return false
 		}
