@@ -129,7 +129,7 @@ type Settings struct {
 	LogLevel           string `json:"logLevel"`
 	AllowLAN           bool   `json:"allowLan"`
 	DisableDNS         bool   `json:"disableDns,omitempty"`
-	TunDisabled        bool   `json:"tunDisabled,omitempty"`
+	TunEnabled         bool   `json:"tunEnabled,omitempty"`
 	TailscaleDisabled  bool   `json:"tailscaleDisabled,omitempty"`
 	LocalIPDisabled    bool   `json:"localIpDisabled,omitempty"`
 	VerysyncDisabled   bool   `json:"verysyncDisabled,omitempty"`

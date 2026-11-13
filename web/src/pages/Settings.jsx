@@ -1,28 +1,80 @@
-export default function SettingsPage({ state, mutate }) {
+const TARGET_LABELS = {
+  auto: '自动（按 UA，按 Clash 处理）',
+  clash: 'Clash / mihomo',
+  shadowrocket: 'Shadowrocket（小火箭）',
+  passwall: 'PassWall',
+}
+
+// 每项对当前导出目标是否有效；不支持项在界面上置灰并真正禁用。
+// passwall 只输出节点分享链接，除配置名 / 订阅更新间隔 / 节点筛选外全部无效。
+const SUPPORT = {
+  clash: {
+    mixedPort: true,
+    allowLan: true,
+    ipv6: true,
+    dns: true,
+    tun: true,
+    tailscale: true,
+    localIp: true,
+    verysync: true,
+    bt: true,
+    commonOnly: true,
+  },
+  shadowrocket: {
+    mixedPort: false,
+    allowLan: false,
+    ipv6: true,
+    dns: true,
+    tun: false,
+    tailscale: true,
+    localIp: true,
+    verysync: true,
+    bt: true,
+    commonOnly: true,
+  },
+  passwall: {},
+}
+
+function Toggle({ enabled, checked, onChange, children }) {
+  return (
+    <label className={'row' + (enabled ? '' : ' unsupported')} style={{ gap: 6 }}>
+      <input type="checkbox" checked={checked} disabled={!enabled} onChange={onChange} />
+      {children}
+    </label>
+  )
+}
+
+export default function SettingsPage({ state, mutate, target }) {
   const s = state.settings
   const set = (key, value) =>
     mutate((next) => {
       next.settings[key] = value
     })
 
+  const targetLabel = TARGET_LABELS[target] || TARGET_LABELS.auto
+  const support = SUPPORT[target] || SUPPORT.clash
+  const ok = (key) => !!support[key]
+  const targetHint = ok('tun') ? `当前导出目标：${targetLabel}` : `当前导出目标：${targetLabel}，灰色项对该客户端无效`
+
   return (
     <>
       <div className="card">
         <div className="card-head">
           <h2>基本</h2>
-          <span className="hint">改完自动保存</span>
+          <span className="hint">{targetHint}</span>
         </div>
         <div className="grid2">
           <div className="field">
             <label>配置名</label>
             <input className="input" value={s.title} onChange={(e) => set('title', e.target.value)} />
           </div>
-          <div className="field">
+          <div className={'field' + (ok('mixedPort') ? '' : ' unsupported')}>
             <label>混合端口（mixed-port）</label>
             <input
               className="input"
               type="number"
               value={s.mixedPort}
+              disabled={!ok('mixedPort')}
               onChange={(e) => set('mixedPort', Number(e.target.value) || 0)}
             />
           </div>
@@ -41,71 +93,59 @@ export default function SettingsPage({ state, mutate }) {
       <div className="card">
         <div className="card-head">
           <h2>开关</h2>
+          <span className="hint">{targetHint}</span>
         </div>
         <div className="row" style={{ gap: 18 }}>
-          <label className="row" style={{ gap: 6 }}>
-            <input type="checkbox" checked={!!s.allowLan} onChange={(e) => set('allowLan', e.target.checked)} />
+          <Toggle enabled={ok('allowLan')} checked={!!s.allowLan} onChange={(e) => set('allowLan', e.target.checked)}>
             允许局域网连接
-          </label>
-          <label className="row" style={{ gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={!s.ipv6Disabled}
-              onChange={(e) => set('ipv6Disabled', !e.target.checked)}
-            />
+          </Toggle>
+          <Toggle enabled={ok('ipv6')} checked={!s.ipv6Disabled} onChange={(e) => set('ipv6Disabled', !e.target.checked)}>
             启用 IPv6
-          </label>
-          <label className="row" style={{ gap: 6 }}>
-            <input type="checkbox" checked={!s.disableDns} onChange={(e) => set('disableDns', !e.target.checked)} />
+          </Toggle>
+          <Toggle enabled={ok('dns')} checked={!s.disableDns} onChange={(e) => set('disableDns', !e.target.checked)}>
             加密 DNS（DoH + fake-ip）
-          </label>
-          <label className="row" style={{ gap: 6 }}>
-            <input type="checkbox" checked={!s.tunDisabled} onChange={(e) => set('tunDisabled', !e.target.checked)} />
+          </Toggle>
+          <Toggle enabled={ok('tun')} checked={!!s.tunEnabled} onChange={(e) => set('tunEnabled', e.target.checked)}>
             启用 TUN
-          </label>
-          <label className="row" style={{ gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={!s.tailscaleDisabled}
-              onChange={(e) => set('tailscaleDisabled', !e.target.checked)}
-            />
+          </Toggle>
+          <Toggle
+            enabled={ok('tailscale')}
+            checked={!s.tailscaleDisabled}
+            onChange={(e) => set('tailscaleDisabled', !e.target.checked)}
+          >
             Tailscale 不进 TUN / 网段直连
-          </label>
-          <label className="row" style={{ gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={!s.localIpDisabled}
-              onChange={(e) => set('localIpDisabled', !e.target.checked)}
-            />
+          </Toggle>
+          <Toggle
+            enabled={ok('localIp')}
+            checked={!s.localIpDisabled}
+            onChange={(e) => set('localIpDisabled', !e.target.checked)}
+          >
             本地 IP 直连
-          </label>
-          <label className="row" style={{ gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={!s.verysyncDisabled}
-              onChange={(e) => set('verysyncDisabled', !e.target.checked)}
-            />
+          </Toggle>
+          <Toggle
+            enabled={ok('verysync')}
+            checked={!s.verysyncDisabled}
+            onChange={(e) => set('verysyncDisabled', !e.target.checked)}
+          >
             微力同步直连
-          </label>
-          <label className="row" style={{ gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={!s.btDisabled}
-              onChange={(e) => set('btDisabled', !e.target.checked)}
-            />
+          </Toggle>
+          <Toggle
+            enabled={ok('bt')}
+            checked={!s.btDisabled}
+            onChange={(e) => set('btDisabled', !e.target.checked)}
+          >
             常见 BT 下载直连（qBittorrent / Transmission 等）
-          </label>
-          <label className="row" style={{ gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={!s.commonOnlyDisabled}
-              onChange={(e) => set('commonOnlyDisabled', !e.target.checked)}
-            />
+          </Toggle>
+          <Toggle
+            enabled={ok('commonOnly')}
+            checked={!s.commonOnlyDisabled}
+            onChange={(e) => set('commonOnlyDisabled', !e.target.checked)}
+          >
             仅代理常见端口
-          </label>
+          </Toggle>
         </div>
         <div className="note" style={{ marginTop: 8 }}>
-          TUN 使用 system 栈并接管 DNS（dns-hijack any:53），需要容器有 NET_ADMIN 权限或直接跑在宿主机。
+          TUN 默认关闭；开启后使用 system 栈并接管 DNS（dns-hijack any:53），需要容器有 NET_ADMIN 权限或直接跑在宿主机。
           直连类开关（Tailscale / 本地 IP / 微力同步 / BT 下载）会写在规则最前面；「仅代理常见端口」只让
           80 / 443 / 8080 / 8443 走分流，其余端口一律直连。关闭加密 DNS 后改用明文解析：国内
           223.5.5.5 / 119.29.29.29，国外 fallback 1.1.1.1 / 8.8.8.8。

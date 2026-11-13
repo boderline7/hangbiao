@@ -4,6 +4,7 @@ import { api } from '../api.js'
 const FORMATS = [
   ['auto', '自动（按 UA）'],
   ['clash', 'Clash / mihomo'],
+  ['shadowrocket', 'Shadowrocket（小火箭）'],
   ['passwall', 'PassWall'],
 ]
 
@@ -33,8 +34,9 @@ async function copyText(text) {
   }
 }
 
-export default function ExportPage({ state }) {
-  const [format, setFormat] = useState('auto')
+export default function ExportPage({ state, target, setTarget }) {
+  const format = target
+  const setFormat = setTarget
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -123,7 +125,7 @@ export default function ExportPage({ state }) {
           </button>
           {copied === 'fail' && <span className="note">浏览器不允许自动复制，按 Ctrl+C / ⌘C 即可</span>}
           <span className="note">
-            可选后缀：auto / clash / passwall，例如 ?target=passwall
+            可选后缀：auto / clash / shadowrocket / passwall，例如 ?target=shadowrocket
           </span>
         </div>
       </div>

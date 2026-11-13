@@ -3,7 +3,7 @@
 > 规则数据来源：[ACL4SSR/ACL4SSR](https://github.com/ACL4SSR/ACL4SSR)，按 commit 直连其仓库，不随本项目分发。
 > 策略组交互参考：[pengchujin/tower](https://github.com/pengchujin/tower)（MIT），代码与界面独立重写。
 
-Web 版代理配置生成器：Go 单二进制 + Docker，跑在 x86 / ARM 服务器上，生成 Clash(mihomo) 配置并对外提供订阅地址，也可导出 PassWall 的 Base64 节点订阅。
+Web 版代理配置生成器：Go 单二进制 + Docker，跑在 x86 / ARM 服务器上，生成 Clash(mihomo) 配置并对外提供订阅地址，也可导出 Shadowrocket（小火箭）与 PassWall 的订阅。
 
 核心模型是**有序策略组**：组的位置就是规则优先级，导出时按组顺序摊平规则，最后补 `MATCH`。调整优先级只需拖拽，不用改模板，也不会被订阅刷新覆盖。
 
@@ -14,8 +14,9 @@ Web 版代理配置生成器：Go 单二进制 + Docker，跑在 x86 / ARM 服�
 - **地区组**：按节点名国旗/关键字识别港、日、美、新、台、韩、英、德、法，自动生成选择组与隐藏的延迟优选组
 - **规则**：13 种类型；规则集只在被引用时写入配置，规则数据走远程 URL
 - **方案**：内置三套，分组页「同步 ACL4SSR」可拉取全部 33 份 ini，无需重建镜像
-- **导出**：Clash、PassWall
-- **开关（默认全开）**：IPv6、TUN + 加密 DNS、Tailscale 直连、本地 IP / 微力同步 / 常见 BT 下载直连、仅代理常见端口
+- **导出**：Clash、Shadowrocket（小火箭，Clash YAML 去掉 mihomo 专属键）、PassWall
+- **开关（TUN 默认关闭，其余默认全开）**：IPv6、TUN + 加密 DNS、Tailscale 直连、本地 IP / 微力同步 / 常见 BT 下载直连、仅代理常见端口
+- **按客户端置灰**：设置页跟随当前导出目标，把该客户端不支持的项置灰并禁用（小火箭不读 TUN / 混合端口 / 允许局域网；PassWall 只保留配置名、更新间隔、节点筛选）
 - **订阅刷新**：按间隔定时刷新（默认 24 小时），也可一键刷新
 - **节点筛选**：正则包含 / 不包含，对导出与分发统一生效
 
@@ -39,7 +40,7 @@ docker run -d --name hangbiao \
 4. 拖动调整组顺序（= 匹配优先级）
 5. **导出** → 预览 → 复制订阅地址
 
-客户端填 `http://<服务器IP>:8630/sub?target=auto`，需要固定格式时换成 `clash` / `passwall`。
+客户端填 `http://<服务器IP>:8630/sub?target=auto`，需要固定格式时换成 `clash` / `shadowrocket`（或 `sr`）/ `passwall`。auto 按 UA 识别，UA 含 `Shadowrocket` 或 `PassWall` 时自动套用对应格式。
 
 ## 数据
 

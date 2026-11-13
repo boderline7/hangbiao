@@ -28,9 +28,10 @@ func TestLoadSubRejectsEmpty(t *testing.T) {
 
 func TestDetectFormat(t *testing.T) {
 	cases := map[string]string{
-		"PassWall/1.0":      "passwall",
-		"clash.meta/1.18.0": "clash",
-		"":                  "clash",
+		"PassWall/1.0":       "passwall",
+		"Shadowrocket/2.2.9": "shadowrocket",
+		"clash.meta/1.18.0":  "clash",
+		"":                   "clash",
 	}
 	for ua, want := range cases {
 		if got := detectFormat(ua); got != want {

@@ -264,6 +264,18 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* 当前导出目标不支持的设置项：整行置灰并禁用，已勾选状态保留显示。 */
+.row.unsupported,
+.field.unsupported {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.row.unsupported input,
+.field.unsupported input {
+  cursor: not-allowed;
+}
+
 .grid2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

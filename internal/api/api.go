@@ -448,6 +448,9 @@ func detectFormat(ua string) string {
 	if strings.Contains(u, "passwall") {
 		return "passwall"
 	}
+	if strings.Contains(u, "shadowrocket") {
+		return "shadowrocket"
+	}
 	return "clash"
 }
 

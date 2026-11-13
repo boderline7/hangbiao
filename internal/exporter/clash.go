@@ -104,6 +104,13 @@ func Build(st *model.State, format string) (Result, error) {
 		}
 		r.Filename = safeName(st.Settings.Title) + ".yaml"
 		return r, nil
+	case "shadowrocket", "sr":
+		r, err := Shadowrocket(st)
+		if err != nil {
+			return Result{}, err
+		}
+		r.Filename = safeName(st.Settings.Title) + "-shadowrocket.yaml"
+		return r, nil
 	case "passwall", "pw":
 		return annotate(PassWall(st), st, "PassWall"), nil
 	}
@@ -258,21 +265,46 @@ func proxyNode(p model.Proxy) (*yaml.Node, error) {
 	return n, nil
 }
 
-// ---------- Clash / mihomo ----------
+// ---------- Clash / mihomo / Shadowrocket ----------
 
+// clashTarget 区分同一份 Clash YAML 模板下的两个客户端。小火箭直接吃
+// Clash YAML，但不认 mihomo 的应用层键，所以按 target 裁掉这些键。
+type clashTarget int
+
+const (
+	targetClash clashTarget = iota
+	targetShadowrocket
+)
+
+// Clash 输出 mihomo 完整配置。
 func Clash(st *model.State) (Result, error) {
+	return clashYAML(st, targetClash)
+}
+
+// Shadowrocket 复用 Clash 渲染，去掉 mihomo 专属键。
+func Shadowrocket(st *model.State) (Result, error) {
+	return clashYAML(st, targetShadowrocket)
+}
+
+func clashYAML(st *model.State, target clashTarget) (Result, error) {
+	mihomo := target == targetClash
 	root := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 	ref := collectRefs(st)
 
-	appendKV(root, "mixed-port", st.Settings.MixedPort)
-	appendKV(root, "allow-lan", st.Settings.AllowLAN)
+	if mihomo {
+		appendKV(root, "mixed-port", st.Settings.MixedPort)
+		appendKV(root, "allow-lan", st.Settings.AllowLAN)
+	}
 	appendKV(root, "mode", st.Settings.Mode)
 	appendKV(root, "log-level", st.Settings.LogLevel)
 	appendKV(root, "ipv6", !st.Settings.IPv6Disabled)
-	appendKV(root, "unified-delay", true)
-	appendKV(root, "tcp-concurrent", true)
+	if mihomo {
+		appendKV(root, "unified-delay", true)
+		appendKV(root, "tcp-concurrent", true)
+	}
 
-	if !st.Settings.TunDisabled {
+	// tun 是 mihomo 的服务端接管开关，小火箭不读，固定不写。
+	if mihomo && st.Settings.TunEnabled {
 		tun := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		appendKV(tun, "enable", true)
 		appendKV(tun, "stack", "system")
@@ -322,8 +354,8 @@ func Clash(st *model.State) (Result, error) {
 		members := expandMembers(g, ref)
 		appendKV(gn, "proxies", members)
 		// select 组的默认选中项默认是 proxies 第一项；显式写 default-selected，
-		// 保证「组成员第一个」就是客户端首次加载时的选中项。
-		if g.Type == "select" {
+		// 保证「组成员第一个」就是客户端首次加载时的选中项。小火箭不认这个键。
+		if mihomo && g.Type == "select" {
 			appendKV(gn, "default-selected", members[0])
 		}
 		if g.Hidden {
@@ -341,7 +373,9 @@ func Clash(st *model.State) (Result, error) {
 			}
 			appendKV(gn, "interval", interval)
 			appendKV(gn, "tolerance", 50)
-			appendKV(gn, "lazy", true)
+			if mihomo {
+				appendKV(gn, "lazy", true)
+			}
 		}
 		gseq.Content = append(gseq.Content, gn)
 	}

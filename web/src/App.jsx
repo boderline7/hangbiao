@@ -20,6 +20,8 @@ export default function App() {
   const [toast, setToast] = useState(null)
   // 默认浅色：旧的 td-theme 键把上一版默认的深色记住了，换新键让已有浏览器也回到浅色。
   const [theme, setTheme] = useState(() => localStorage.getItem('td-theme-v2') || 'light')
+  // 当前导出目标：导出页切换客户端时写在这里，设置页据此把该客户端不支持的项置灰。
+  const [target, setTarget] = useState(() => localStorage.getItem('td-target') || 'auto')
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const timer = useRef(null)
@@ -34,6 +36,11 @@ export default function App() {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('td-theme-v2', theme)
   }, [theme])
+
+  const changeTarget = useCallback((next) => {
+    setTarget(next)
+    localStorage.setItem('td-target', next)
+  }, [])
 
   const showToast = useCallback((msg, kind = 'ok') => {
     setToast({ msg, kind })
@@ -184,8 +191,8 @@ export default function App() {
       {tab === 'subs' && (
         <Subs state={state} replace={replace} toast={showToast} nodeNames={nodeNames} />
       )}
-      {tab === 'export' && <ExportPage state={state} />}
-      {tab === 'settings' && <SettingsPage state={state} mutate={mutate} />}
+      {tab === 'export' && <ExportPage state={state} target={target} setTarget={changeTarget} />}
+      {tab === 'settings' && <SettingsPage state={state} mutate={mutate} target={target} />}
 
       {toast && <div className={'toast' + (toast.kind === 'error' ? ' error' : '')}>{toast.msg}</div>}
     </div>

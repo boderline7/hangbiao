@@ -61,19 +61,8 @@ func TestClashDefaults(t *testing.T) {
 		t.Errorf("默认应开启 ipv6，实际 %v", doc["ipv6"])
 	}
 
-	tun, ok := doc["tun"].(map[string]any)
-	if !ok {
-		t.Fatal("默认应该写 tun 段")
-	}
-	if tun["enable"] != true {
-		t.Errorf("tun.enable=%v", tun["enable"])
-	}
-	ex, _ := tun["route-exclude-address"].([]any)
-	if len(ex) != 2 {
-		t.Fatalf("route-exclude-address=%v", tun["route-exclude-address"])
-	}
-	if ex[0] != "100.64.0.0/10" || ex[1] != "fd7a:115c:a1e0::/48" {
-		t.Errorf("route-exclude-address=%v", ex)
+	if _, ok := doc["tun"]; ok {
+		t.Error("TUN 默认关闭，不应该写 tun 段")
 	}
 
 	dns, ok := doc["dns"].(map[string]any)
@@ -149,15 +138,44 @@ func TestClashIPv6Disabled(t *testing.T) {
 	}
 }
 
+func TestClashTunEnabled(t *testing.T) {
+	doc := renderClash(t, clashTestState(t, model.Settings{TunEnabled: true}))
+
+	tun, ok := doc["tun"].(map[string]any)
+	if !ok {
+		t.Fatal("开启 TUN 后应该写 tun 段")
+	}
+	if tun["enable"] != true {
+		t.Errorf("tun.enable=%v", tun["enable"])
+	}
+	ex, _ := tun["route-exclude-address"].([]any)
+	if len(ex) != 2 {
+		t.Fatalf("route-exclude-address=%v", tun["route-exclude-address"])
+	}
+	if ex[0] != "100.64.0.0/10" || ex[1] != "fd7a:115c:a1e0::/48" {
+		t.Errorf("route-exclude-address=%v", ex)
+	}
+
+	// Tailscale 直连开关关掉后，TUN 段里也不该再排除 Tailscale 网段。
+	doc = renderClash(t, clashTestState(t, model.Settings{TunEnabled: true, TailscaleDisabled: true}))
+	tun, ok = doc["tun"].(map[string]any)
+	if !ok {
+		t.Fatal("开启 TUN 后应该写 tun 段")
+	}
+	if _, ok := tun["route-exclude-address"]; ok {
+		t.Errorf("关闭 Tailscale 直连后不应写 route-exclude-address：%v", tun["route-exclude-address"])
+	}
+}
+
 func TestClashDisableSwitches(t *testing.T) {
 	doc := renderClash(t, clashTestState(t, model.Settings{
-		DisableDNS: true, TunDisabled: true, TailscaleDisabled: true,
+		DisableDNS: true, TailscaleDisabled: true,
 		LocalIPDisabled: true, VerysyncDisabled: true, BtDisabled: true,
 		CommonOnlyDisabled: true,
 	}))
 
 	if _, ok := doc["tun"]; ok {
-		t.Error("关闭 TUN 后不应该写 tun 段")
+		t.Error("TUN 默认关闭，不应该写 tun 段")
 	}
 	// 关闭加密 DNS 只是换成明文解析，dns 段本身要保留。
 	dns, ok := doc["dns"].(map[string]any)
